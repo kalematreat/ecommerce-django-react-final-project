@@ -54,14 +54,13 @@ jobs:
             exit 1
           fi
 
-      - name: Install npm packages and rub build command
+      - name: Install npm packages and run build command
         run: |
           cd ./frontend
           npm install
           npm run build
           rm -rf node_modules
 
-      # Cache the virtual environment instead of uploading it as an artifact
       - name: Cache virtual environment
         uses: actions/cache@v3
         with:
@@ -96,7 +95,6 @@ jobs:
           python-version: '3.10.4'
           cache: 'pip'
 
-      # Restore the cached virtual environment
       - name: Cache virtual environment
         uses: actions/cache@v3
         with:
@@ -173,7 +171,7 @@ jobs:
           status: custom
           custom_payload: |
             {
-              "title": ":tada: Build successfull, deployed to Render.com",
+              "title": ":tada: Build successful, deployed to Render.com",
               "text": "You can view the live site at <https://blog-and-react-js-blog-latest.onrender.com/>",
               "color": "#36a64f",
               "fields": [
@@ -194,7 +192,6 @@ jobs:
     needs: test
     runs-on: ubuntu-latest
     steps:
-      
       - name: Download test report
         uses: actions/download-artifact@v4
         with:
@@ -207,153 +204,24 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./report
 
-      - name: Send notification
-        run: |
-          echo "Tests failed, sending notification to developers."
-      
       - name: Send Slack notification
         uses: 8398a7/action-slack@v3
         with:
           status: custom
           custom_payload: |
             {
-              text: "Tests failed",
-              attachments: [{
-                "author_name": "github actions", // json
-                fallback: 'fallback',
-                color: 'danger',
-                title: 'CI Result',
-                text: 'The test job failed. Please check the logs on the GitHub Actions page for more details.',
-                fields: [],
-                actions: []
-              },
-              {
-                title: 'Test Report Zip',
-                text: 'The test report is attached as a zip file.',
-                fields: [],
-                actions: [],
-                title_link: '${{ needs.test.outputs.artifact-url }}',
-                footer: '',
-                footer_icon: '',
-                image_url: '',
-                thumb_url: '',
-                author_name: '',
-                author_link: '',
-                author_icon: '',
-                video_html: '',
-                video_url: '',
-              },
-              {
-                title: 'Test Report Url',
-                text: 'The test report is attached as a url to github pages.',
-                fields: [],
-                actions: [],
-                title_link: 'https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/report.html',
-                footer: '',
-                footer_icon: '',
-                image_url: '',
-                thumb_url: '',
-                author_name: '',
-                author_link: '',
-                author_icon: '',
-                video_html: '',
-                video_url: '',
-              }]
+              "text": "Tests failed",
+              "attachments": [
+                {
+                  "title": "Test Report URL",
+                  "text": "The test report is available at GitHub Pages.",
+                  "title_link": "https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/report.html",
+                  "color": "danger"
+                }
+              ]
             }        
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-      
-      # - name: Send Slack notification
-      #   uses: 8398a7/action-slack@v3
-      #   with:
-      #     status: custom
-      #     custom_payload: |
-      #       {
-      #         text: "Tests failed",
-      #         attachments: [{
-      #           "author_name": "github actions", // json
-      #           fallback: 'fallback',
-      #           color: 'danger',
-      #           title: 'CI Result',
-      #           text: 'The test job failed. Please check the logs on the GitHub Actions page for more details.',
-      #           fields: [],
-      #           actions: []
-      #         },
-      #         {
-      #           title: 'Test Report',
-      #           text: 'The test report is attached as a file.',
-      #           fields: [],
-      #           actions: [],
-      #           title_link: '${{ needs.test.outputs.artifact-url }}',
-      #           footer: '',
-      #           footer_icon: '',
-      #           image_url: '',
-      #           thumb_url: '',
-      #           author_name: '',
-      #           author_link: '',
-      #           author_icon: '',
-      #           video_html: '',
-      #           video_url: '',
-      #         }]
-      #       }        
-      #   env:
-      #     SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-      
-      # - name: Send email notification
-      #   uses: dawidd6/action-send-mail@master
-      #   with:
-      #     server_address: smtp.gmail.com
-      #     server_port: 587
-      #     username: ${{ secrets.EMAIL_USERNAME }}
-      #     password: ${{ secrets.EMAIL_PASSWORD }}
-      #     subject: "CI/CD Pipeline Failed"
-      #     to: ${{ secrets.EMAIL_TO }}
-      #     from: ${{ secrets.EMAIL_FROM }}
-      #     body: |
-      #       The CI/CD pipeline has failed. Please check the logs for more details.
 
-      # - name: Login to Jira
-      #   uses: atlassian/gajira-login@v3
-      #   env:
-      #     JIRA_BASE_URL: ${{ secrets.JIRA_ACCOUNT_URL }}
-      #     JIRA_USER_EMAIL: ${{ secrets.JIRA_USERNAME }}
-      #     JIRA_API_TOKEN: ${{ secrets.JIRA_PASSWORD }}
-      
-      # - name: Create Jira issue
-      #   id: create
-      #   uses: atlassian/gajira-create@v3
-      #   with:
-      #     project: '${{ vars.JIRA_PROJECT_KEY }}'
-      #     issuetype: 'Bug'
-      #     summary: 'CI/CD Pipeline Failed'
-      #     description: |
-      #       The CI/CD pipeline has failed. Please check the logs for more details.
-      #       [Test Report Zip](${{ needs.test.outputs.artifact-url }})
-      #       You can also view the test report on github pages
-      #       [Test Report Url](https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/report.html)
-          
-      # - name: Log created issue
-      #   run: echo "Issue ${{ steps.create.outputs.issue }} was created"
-
-      # - name: Open Jira issue
-      #   uses: bryannice/gitactions-jira-issue-creation@master
-      #   env:
-      #     JIRA_ACCOUNT_URL: ${{ secrets.JIRA_ACCOUNT_URL }}
-      #     JIRA_API_TOKEN: ${{ secrets.JIRA_PASSWORD }}
-      #     # JIRA_ISSUE_ATTACHMENT: log_file.log
-      #     JIRA_ISSUE_DESCRIPTION: 'The CI/CD pipeline has failed. Please check the logs for more details. [Test Report](${{ needs.test.outputs.artifact-url }})'
-      #     JIRA_ISSUE_SUMMARY: 'CI/CD Pipeline Automatic Tests Failed'
-      #     JIRA_ISSUE_TYPE: 'Bug'
-      #     JIRA_PROJECT: ${{ secrets.JIRA_PROJECT_KEY }}
-      #     JIRA_USERNAME: ${{ secrets.JIRA_USERNAME }}
-          
-      # - name: Open GitHub issue
-      #   uses: actions/github-script@v6
-      #   with:
-      #     script: |
-      #       github.rest.issues.create({
-      #         owner: context.repo.owner,
-      #         repo: context.repo.repo,
-      #         title: 'CI/CD Pipeline Failed',
-      #         body: 'The CI/CD pipeline has failed. Please check the logs for more details. [Test Report](${{ needs.test.outputs.artifact-url }})'
-      #       })  
+      - name: Log Error Message
+        run: echo "Tests failed, notifications sent."
