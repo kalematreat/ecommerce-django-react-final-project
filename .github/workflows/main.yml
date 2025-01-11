@@ -105,8 +105,8 @@ jobs:
       
       - name: Build and Run Docker Image for E2E locally
         run: |
-          docker build -t ${{ secrets.DOCKER_USERNAME }}/blog-and-react-js-blog-e2e:latest .
-          docker run --name blog-and-react-js-blog-e2e --rm -d -p 8000:8000 -e PUBLIC_URL=http://localhost:8000 ${{ secrets.DOCKER_USERNAME }}/blog-and-react-js-blog-e2e:latest
+          docker build -t blog-and-react-js-blog-e2e:latest .
+          docker run --name blog-and-react-js-blog-e2e --rm -d -p 8000:8000 -e PUBLIC_URL=http://localhost:8000 blog-and-react-js-blog-e2e:latest
 
       - name: Run Selenium
         run: |
@@ -136,92 +136,91 @@ jobs:
           name: test-report
           path: ./backend/report
 
-  deploy:
-    if: success()
-    needs: test
-    runs-on: ubuntu-latest
-    steps:
-      - name: Download code
-        uses: actions/download-artifact@v4
-        with:
-          name: code
-          path: .
+  # deploy:
+  #   if: success()
+  #   needs: test
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: Download code
+  #       uses: actions/download-artifact@v4
+  #       with:
+  #         name: code
+  #         path: .
 
-      - name: Build Docker Image
-        run: |
-          docker build -t ${{ secrets.DOCKER_USERNAME }}/blog-and-react-js-blog:latest .
+  #     - name: Build Docker Image
+  #       run: |
+  #         docker build -t ${{ secrets.DOCKER_USERNAME }}/blog-and-react-js-blog:latest .
 
-      - name: Login and Push Docker Image
-        run: |
-          echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
-          docker push ${{ secrets.DOCKER_USERNAME }}/blog-and-react-js-blog:latest
+  #     - name: Login and Push Docker Image
+  #       run: |
+  #         echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
+  #         docker push ${{ secrets.DOCKER_USERNAME }}/blog-and-react-js-blog:latest
           
-      - name: Deploy to render.com
-        uses: gh-actions-workflows/deploy-docker-render@v1.1
-        with:
-          deploy-hook: ${{ secrets.RENDER_DEPLOY_HOOK }}
-          image-url: ${{ secrets.DOCKER_USERNAME }}/blog-and-react-js-blog:latest
-          render-api-key: ${{ secrets.RENDER_TOKEN }}
-          wait-for-deployment: true
+  #     - name: Deploy to render.com
+  #       uses: gh-actions-workflows/deploy-docker-render@v1.1
+  #       with:
+  #         deploy-hook: ${{ secrets.RENDER_DEPLOY_HOOK }}
+  #         image-url: ${{ secrets.DOCKER_USERNAME }}/blog-and-react-js-blog:latest
+  #         render-api-key: ${{ secrets.RENDER_TOKEN }}
+  #         wait-for-deployment: true
 
-          
-      - name: Send Slack Notification
-        uses: 8398a7/action-slack@v3
-        with:
-          status: custom
-          custom_payload: |
-            {
-              "title": ":tada: Build successful, deployed to Render.com",
-              "text": "You can view the live site at <https://blog-and-react-js-blog-latest.onrender.com/>",
-              "color": "#36a64f",
-              "fields": [
-                {
-                  "title": "Live Site",
-                  "value": "<https://blog-and-react-js-blog-latest.onrender.com/>",
-                  "short": false
-                }
-              ],
-              "footer": "Render.com",
-              "footer_icon": "https://avatars.githubusercontent.com/u/41908446?s=200&v=4"
-            }
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+  #     - name: Send Slack Notification
+  #       uses: 8398a7/action-slack@v3
+  #       with:
+  #         status: custom
+  #         custom_payload: |
+  #           {
+  #             "title": ":tada: Build successful, deployed to Render.com",
+  #             "text": "You can view the live site at <https://blog-and-react-js-blog-latest.onrender.com/>",
+  #             "color": "#36a64f",
+  #             "fields": [
+  #               {
+  #                 "title": "Live Site",
+  #                 "value": "<https://blog-and-react-js-blog-latest.onrender.com/>",
+  #                 "short": false
+  #               }
+  #             ],
+  #             "footer": "Render.com",
+  #             "footer_icon": "https://avatars.githubusercontent.com/u/41908446?s=200&v=4"
+  #           }
+  #       env:
+  #         SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
 
-  notify:
-    if: failure()
-    needs: test
-    runs-on: ubuntu-latest
-    steps:
-      - name: Download test report
-        uses: actions/download-artifact@v4
-        with:
-          name: test-report
-          path: ./report
+  # notify:
+  #   if: failure()
+  #   needs: test
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: Download test report
+  #       uses: actions/download-artifact@v4
+  #       with:
+  #         name: test-report
+  #         path: ./report
       
-      - name: Deploy report to github pages
-        uses: peaceiris/actions-gh-pages@v3
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./report
+  #     - name: Deploy report to github pages
+  #       uses: peaceiris/actions-gh-pages@v3
+  #       with:
+  #         github_token: ${{ secrets.GITHUB_TOKEN }}
+  #         publish_dir: ./report
 
-      - name: Send Slack notification
-        uses: 8398a7/action-slack@v3
-        with:
-          status: custom
-          custom_payload: |
-            {
-              "text": "Tests failed",
-              "attachments": [
-                {
-                  "title": "Test Report URL",
-                  "text": "The test report is available at GitHub Pages.",
-                  "title_link": "https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/report.html",
-                  "color": "danger"
-                }
-              ]
-            }        
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+  #     - name: Send Slack notification
+  #       uses: 8398a7/action-slack@v3
+  #       with:
+  #         status: custom
+  #         custom_payload: |
+  #           {
+  #             "text": "Tests failed",
+  #             "attachments": [
+  #               {
+  #                 "title": "Test Report URL",
+  #                 "text": "The test report is available at GitHub Pages.",
+  #                 "title_link": "https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/report.html",
+  #                 "color": "danger"
+  #               }
+  #             ]
+  #           }        
+  #       env:
+  #         SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
 
-      - name: Log Error Message
-        run: echo "Tests failed, notifications sent."
+  #     - name: Log Error Message
+  #       run: echo "Tests failed, notifications sent."
