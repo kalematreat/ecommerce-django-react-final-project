@@ -1,0 +1,359 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  source:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+      - name: Upload code
+        uses: actions/upload-artifact@v4
+        with:
+          name: code
+          path: .
+          retention-days: 1
+
+  build:
+    needs: source
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete old artifacts
+        uses: geekyeggo/delete-artifact@v2
+        with:
+          name: code
+      
+      - name: Download code
+        uses: actions/download-artifact@v4
+        with:
+          name: code
+          path: .
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10.4'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m venv .venv
+          source .venv/bin/activate
+          pip install --upgrade pip
+          if [ -f "./backend/requirements.txt" ]; then
+            pip install -r ./backend/requirements.txt
+          else
+            echo "Error: requirements.txt not found in ./backend"
+            exit 1
+          fi
+
+      - name: Install npm packages and rub build command
+        run: |
+          cd ./frontend
+          npm install
+          npm run build
+          rm -rf node_modules
+
+      # Cache the virtual environment instead of uploading it as an artifact
+      - name: Cache virtual environment
+        uses: actions/cache@v3
+        with:
+          path: .venv
+          key: venv-${{ runner.os }}-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: |
+            venv-${{ runner.os }}-
+
+      - name: Upload code
+        uses: actions/upload-artifact@v4
+        with:
+          name: code
+          path: .
+          overwrite: true
+          retention-days: 1
+
+  test:
+    needs: build
+    runs-on: ubuntu-latest
+    outputs:
+      artifact-url: ${{ steps.upload-test-report.outputs.artifact-url }}
+    steps:
+      - name: Download code
+        uses: actions/download-artifact@v4
+        with:
+          name: code
+          path: .
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10.4'
+          cache: 'pip'
+
+      # Restore the cached virtual environment
+      - name: Cache virtual environment
+        uses: actions/cache@v3
+        with:
+          path: .venv
+          key: venv-${{ runner.os }}-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: |
+            venv-${{ runner.os }}-
+      
+      - name: Build and Run Docker Image for E2E locally
+        run: |
+          docker build -t ${{ secrets.DOCKER_USERNAME }}/blog-and-react-js-blog-e2e:latest .
+          docker run --name blog-and-react-js-blog-e2e --rm -d -p 8000:8000 -e PUBLIC_URL=http://localhost:8000 ${{ secrets.DOCKER_USERNAME }}/blog-and-react-js-blog-e2e:latest
+
+      - name: Run Selenium
+        run: |
+          docker run --rm -d --network=host --name selenium selenium/standalone-chromium:latest
+
+      - name: Install wait-for-it.sh
+        run: |
+          curl -sSfL https://github.com/vishnubob/wait-for-it/archive/refs/heads/master.tar.gz | tar xz -C /tmp
+          sudo cp /tmp/wait-for-it-master/wait-for-it.sh /usr/local/bin/
+          sudo chmod +x /usr/local/bin/wait-for-it.sh
+  
+      - name: Wait for Selenium WebDriver server to start
+        run: |
+          wait-for-it.sh localhost:4444 --timeout=30
+  
+      - name: Run tests
+        run: |
+          source .venv/bin/activate
+          cd ./backend 
+          pytest --html-report=./report/report.html --title='PYTEST REPORT'
+      
+      - name: Upload test report
+        id: upload-test-report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-report
+          path: ./backend/report
+
+  deploy:
+    if: success()
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download code
+        uses: actions/download-artifact@v4
+        with:
+          name: code
+          path: .
+
+      - name: Build Docker Image
+        run: |
+          docker build -t ${{ secrets.DOCKER_USERNAME }}/blog-and-react-js-blog:latest .
+
+      - name: Login and Push Docker Image
+        run: |
+          echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
+          docker push ${{ secrets.DOCKER_USERNAME }}/blog-and-react-js-blog:latest
+          
+      - name: Deploy to render.com
+        uses: gh-actions-workflows/deploy-docker-render@v1.1
+        with:
+          deploy-hook: ${{ secrets.RENDER_DEPLOY_HOOK }}
+          image-url: ${{ secrets.DOCKER_USERNAME }}/blog-and-react-js-blog:latest
+          render-api-key: ${{ secrets.RENDER_TOKEN }}
+          wait-for-deployment: true
+
+          
+      - name: Send Slack Notification
+        uses: 8398a7/action-slack@v3
+        with:
+          status: custom
+          custom_payload: |
+            {
+              "title": ":tada: Build successfull, deployed to Render.com",
+              "text": "You can view the live site at <https://blog-and-react-js-blog-latest.onrender.com/>",
+              "color": "#36a64f",
+              "fields": [
+                {
+                  "title": "Live Site",
+                  "value": "<https://blog-and-react-js-blog-latest.onrender.com/>",
+                  "short": false
+                }
+              ],
+              "footer": "Render.com",
+              "footer_icon": "https://avatars.githubusercontent.com/u/41908446?s=200&v=4"
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+  notify:
+    if: failure()
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      
+      - name: Download test report
+        uses: actions/download-artifact@v4
+        with:
+          name: test-report
+          path: ./report
+      
+      - name: Deploy report to github pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./report
+
+      - name: Send notification
+        run: |
+          echo "Tests failed, sending notification to developers."
+      
+      - name: Send Slack notification
+        uses: 8398a7/action-slack@v3
+        with:
+          status: custom
+          custom_payload: |
+            {
+              text: "Tests failed",
+              attachments: [{
+                "author_name": "github actions", // json
+                fallback: 'fallback',
+                color: 'danger',
+                title: 'CI Result',
+                text: 'The test job failed. Please check the logs on the GitHub Actions page for more details.',
+                fields: [],
+                actions: []
+              },
+              {
+                title: 'Test Report Zip',
+                text: 'The test report is attached as a zip file.',
+                fields: [],
+                actions: [],
+                title_link: '${{ needs.test.outputs.artifact-url }}',
+                footer: '',
+                footer_icon: '',
+                image_url: '',
+                thumb_url: '',
+                author_name: '',
+                author_link: '',
+                author_icon: '',
+                video_html: '',
+                video_url: '',
+              },
+              {
+                title: 'Test Report Url',
+                text: 'The test report is attached as a url to github pages.',
+                fields: [],
+                actions: [],
+                title_link: 'https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/report.html',
+                footer: '',
+                footer_icon: '',
+                image_url: '',
+                thumb_url: '',
+                author_name: '',
+                author_link: '',
+                author_icon: '',
+                video_html: '',
+                video_url: '',
+              }]
+            }        
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+      
+      # - name: Send Slack notification
+      #   uses: 8398a7/action-slack@v3
+      #   with:
+      #     status: custom
+      #     custom_payload: |
+      #       {
+      #         text: "Tests failed",
+      #         attachments: [{
+      #           "author_name": "github actions", // json
+      #           fallback: 'fallback',
+      #           color: 'danger',
+      #           title: 'CI Result',
+      #           text: 'The test job failed. Please check the logs on the GitHub Actions page for more details.',
+      #           fields: [],
+      #           actions: []
+      #         },
+      #         {
+      #           title: 'Test Report',
+      #           text: 'The test report is attached as a file.',
+      #           fields: [],
+      #           actions: [],
+      #           title_link: '${{ needs.test.outputs.artifact-url }}',
+      #           footer: '',
+      #           footer_icon: '',
+      #           image_url: '',
+      #           thumb_url: '',
+      #           author_name: '',
+      #           author_link: '',
+      #           author_icon: '',
+      #           video_html: '',
+      #           video_url: '',
+      #         }]
+      #       }        
+      #   env:
+      #     SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+      
+      # - name: Send email notification
+      #   uses: dawidd6/action-send-mail@master
+      #   with:
+      #     server_address: smtp.gmail.com
+      #     server_port: 587
+      #     username: ${{ secrets.EMAIL_USERNAME }}
+      #     password: ${{ secrets.EMAIL_PASSWORD }}
+      #     subject: "CI/CD Pipeline Failed"
+      #     to: ${{ secrets.EMAIL_TO }}
+      #     from: ${{ secrets.EMAIL_FROM }}
+      #     body: |
+      #       The CI/CD pipeline has failed. Please check the logs for more details.
+
+      # - name: Login to Jira
+      #   uses: atlassian/gajira-login@v3
+      #   env:
+      #     JIRA_BASE_URL: ${{ secrets.JIRA_ACCOUNT_URL }}
+      #     JIRA_USER_EMAIL: ${{ secrets.JIRA_USERNAME }}
+      #     JIRA_API_TOKEN: ${{ secrets.JIRA_PASSWORD }}
+      
+      # - name: Create Jira issue
+      #   id: create
+      #   uses: atlassian/gajira-create@v3
+      #   with:
+      #     project: '${{ vars.JIRA_PROJECT_KEY }}'
+      #     issuetype: 'Bug'
+      #     summary: 'CI/CD Pipeline Failed'
+      #     description: |
+      #       The CI/CD pipeline has failed. Please check the logs for more details.
+      #       [Test Report Zip](${{ needs.test.outputs.artifact-url }})
+      #       You can also view the test report on github pages
+      #       [Test Report Url](https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/report.html)
+          
+      # - name: Log created issue
+      #   run: echo "Issue ${{ steps.create.outputs.issue }} was created"
+
+      # - name: Open Jira issue
+      #   uses: bryannice/gitactions-jira-issue-creation@master
+      #   env:
+      #     JIRA_ACCOUNT_URL: ${{ secrets.JIRA_ACCOUNT_URL }}
+      #     JIRA_API_TOKEN: ${{ secrets.JIRA_PASSWORD }}
+      #     # JIRA_ISSUE_ATTACHMENT: log_file.log
+      #     JIRA_ISSUE_DESCRIPTION: 'The CI/CD pipeline has failed. Please check the logs for more details. [Test Report](${{ needs.test.outputs.artifact-url }})'
+      #     JIRA_ISSUE_SUMMARY: 'CI/CD Pipeline Automatic Tests Failed'
+      #     JIRA_ISSUE_TYPE: 'Bug'
+      #     JIRA_PROJECT: ${{ secrets.JIRA_PROJECT_KEY }}
+      #     JIRA_USERNAME: ${{ secrets.JIRA_USERNAME }}
+          
+      # - name: Open GitHub issue
+      #   uses: actions/github-script@v6
+      #   with:
+      #     script: |
+      #       github.rest.issues.create({
+      #         owner: context.repo.owner,
+      #         repo: context.repo.repo,
+      #         title: 'CI/CD Pipeline Failed',
+      #         body: 'The CI/CD pipeline has failed. Please check the logs for more details. [Test Report](${{ needs.test.outputs.artifact-url }})'
+      #       })  
