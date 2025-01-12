@@ -47,10 +47,10 @@ jobs:
           python -m venv .venv
           source .venv/bin/activate
           pip install --upgrade pip
-          if [ -f "./backend/requirements.txt" ]; then
-            pip install -r ./backend/requirements.txt
+          if [ -f "./ecommerce-django-react/requirements.txt" ]; then
+            pip install -r ./ecommerce-django-react/requirements.txt
           else
-            echo "Error: requirements.txt not found in ./backend"
+            echo "Error: requirements.txt not found in ./ecommerce-django-react"
             exit 1
           fi
 
@@ -117,7 +117,7 @@ jobs:
           curl -sSfL https://github.com/vishnubob/wait-for-it/archive/refs/heads/master.tar.gz | tar xz -C /tmp
           sudo cp /tmp/wait-for-it-master/wait-for-it.sh /usr/local/bin/
           sudo chmod +x /usr/local/bin/wait-for-it.sh
-  
+          
       - name: Wait for Selenium WebDriver server to start
         run: |
           wait-for-it.sh localhost:4444 --timeout=30
@@ -135,6 +135,7 @@ jobs:
         with:
           name: test-report
           path: ./backend/report
+
 
   # deploy:
   #   if: success()
