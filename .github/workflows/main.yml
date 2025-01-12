@@ -47,8 +47,8 @@ jobs:
           python -m venv .venv
           source .venv/bin/activate
           pip install --upgrade pip
-          if [ -f "./backend/requirements.txt" ]; then
-            pip install -r ./backend/requirements.txt
+          if [ -f "requirements.txt" ]; then
+            pip install -r requirements.txt
           else
             echo "Error: requirements.txt not found in ./backend"
             exit 1
