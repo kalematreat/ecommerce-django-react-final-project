@@ -1,8 +1,7 @@
 FROM python:3
-ENV PYTHONDONTWRITEBYTECODE=1
-ENV PYTHONUNBUFFERED=1
+RUN pip install requests
 WORKDIR /code
-COPY requirements.txt requirements.txt
+COPY backend/requirements.txt requirements.txt
 RUN pip install -r requirements.txt
-COPY . .
-CMD ["python", "manage.py","runserver"]
+COPY backend/ . 
+CMD ["python", "manage.py", "runserver"]
