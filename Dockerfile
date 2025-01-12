@@ -7,10 +7,4 @@ RUN pip install -r requirements.txt
 COPY . .
 EXPOSE 8000
 ENV DJANGO_SETTING_MODULE=background.settings
-# CMD ["python", "manage.py","runserver"]
-
-WORKDIR /code/frontend
-RUN npm install
-RUN npm run build
-# Run the application using gunicorn
 CMD ["gunicorn", "--workers", "3", "--bind", "0.0.0.0:8000", "backend.wsgi:application"]
