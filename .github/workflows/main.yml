@@ -1,5 +1,3 @@
-name: CI/CD Pipeline
-
 on:
   push:
     branches:
@@ -8,18 +6,20 @@ on:
     branches:
       - main
 
-jobs:
+jobs: 
   source:
     runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v3
-      - name: Upload code
+    steps: 
+      - name: Check out repository code #Get source code
+        uses: actions/checkout@v4
+      
+      - name: Upload the code
         uses: actions/upload-artifact@v4
         with:
           name: code
-          path: . # تأكد من أن هذا يتضمن جميع الدلائل الفرعية
-
+          path: .
+          retention-days: 1
+  
   build:
     needs: source
     runs-on: ubuntu-latest
@@ -33,12 +33,20 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: code
-          path: . # تأكد من أن الكود يتم تنزيله في السياق الصحيح
+          path: .
 
-      - name: Set up Python
+      - name: Cache virtual environment
+        uses: actions/cache@v3
+        with:
+          path: .venv
+          key: venv-${{ runner.os }}-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: |
+            venv-${{ runner.os }}-
+
+      - name: Set up python 3.12
         uses: actions/setup-python@v4
         with:
-          python-version: '3.10.4'
+          python-version: '3.12'
           cache: 'pip'
 
       - name: Install dependencies
@@ -46,34 +54,21 @@ jobs:
           python -m venv .venv
           source .venv/bin/activate
           pip install --upgrade pip
-          if [ -f "./backend/requirements.txt" ]; then
-            pip install -r ./backend/requirements.txt
-          else
-            echo "Error: requirements.txt not found in ./backend"
-            exit 1
-          fi
-
-      - name: Install npm packages and run build command
+          pip install -r requirements.txt
+          
+            
+      - name: Install npm and run build
         run: |
           cd ./frontend
           npm install
           npm run build
           rm -rf node_modules
 
-      - name: Cache virtual environment
-        uses: actions/cache@v3
-        with:
-          path: .venv
-          key: venv-${{ runner.os }}-${{ hashFiles('**/backend/requirements.txt') }} # تعديل ليتحقق من مسار ملف requirements.txt في مجلد backend
-          restore-keys: |
-            venv-${{ runner.os }}-
-
-      - name: Upload code
+      - name: Upload the code
         uses: actions/upload-artifact@v4
         with:
           name: code
           path: .
-          overwrite: true
           retention-days: 1
 
   test:
@@ -86,46 +81,26 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: code
-          path: . # تأكد من تنزيل الكود في المسار الصحيح
+          path: .
 
-      - name: Set up Python
+      - name: Set up python 3.12
         uses: actions/setup-python@v4
         with:
-          python-version: '3.10.4'
+          python-version: '3.12'
           cache: 'pip'
 
       - name: Cache virtual environment
         uses: actions/cache@v3
         with:
           path: .venv
-          key: venv-${{ runner.os }}-${{ hashFiles('**/backend/requirements.txt') }} # تعديل ليتحقق من مسار ملف requirements.txt في مجلد backend
+          key: venv-${{ runner.os }}-${{ hashFiles('**/requirements.txt') }}
           restore-keys: |
-            venv-${{ runner.os }}-
-      
-      - name: Build and Run Docker Image for E2E locally
-        run: |
-          docker build -t blog-and-react-js-blog-e2e:latest .
-          docker run --name blog-and-react-js-blog-e2e --rm -d -p 8000:8000 -e PUBLIC_URL=http://localhost:8000 blog-and-react-js-blog-e2e:latest
+            venv-${{ runner.os }}-   
 
-      - name: Run Selenium
-        run: |
-          docker run --rm -d --network=host --name selenium selenium/standalone-chromium:latest
-
-      - name: Install wait-for-it.sh
-        run: |
-          curl -sSfL https://github.com/vishnubob/wait-for-it/archive/refs/heads/master.tar.gz | tar xz -C /tmp
-          sudo cp /tmp/wait-for-it-master/wait-for-it.sh /usr/local/bin/
-          sudo chmod +x /usr/local/bin/wait-for-it.sh
-  
-      - name: Wait for Selenium WebDriver server to start
-        run: |
-          wait-for-it.sh localhost:4444 --timeout=30
-  
       - name: Run tests
         run: |
-          source .venv/bin/activate
-          cd ./backend 
-          pytest --html-report=./report/report.html --title='PYTEST REPORT'
+            source .venv/bin/activate
+            pytest tests/ --html-report=./report/report.html 
       
       - name: Upload test report
         id: upload-test-report
