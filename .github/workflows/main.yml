@@ -102,26 +102,7 @@ jobs:
           key: venv-${{ runner.os }}-${{ hashFiles('**/requirements.txt') }}
           restore-keys: |
             venv-${{ runner.os }}-
-      
-      - name: Build and Run Docker Image for E2E locally
-        run: |
-          docker build -t django:latest .
-          docker run --name django --rm -d -p 8000:8000 -e PUBLIC_URL=http://localhost:8000 django:latest
-
-      - name: Run Selenium
-        run: |
-          docker run --rm -d --network=host --name selenium selenium/standalone-chromium:latest
-
-      - name: Install wait-for-it.sh
-        run: |
-          curl -sSfL https://github.com/vishnubob/wait-for-it/archive/refs/heads/master.tar.gz | tar xz -C /tmp
-          sudo cp /tmp/wait-for-it-master/wait-for-it.sh /usr/local/bin/
-          sudo chmod +x /usr/local/bin/wait-for-it.sh
-  
-      - name: Wait for Selenium WebDriver server to start
-        run: |
-          wait-for-it.sh localhost:4444 --timeout=30
-  
+    
       - name: Run tests
         run: |
           source .venv/bin/activate
