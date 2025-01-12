@@ -150,43 +150,43 @@ jobs:
 
         - name: Build Docker Image
           run: |
-            docker build -t ${{ secrets.DOCKER_USERNAME }}/blog-and-react-js-blog:latest .
+            docker build -t ${{ secrets.DOCKER_USERNAME }}/django:latest .
 
         - name: Login and Push Docker Image
           run: |
             echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
-            docker push ${{ secrets.DOCKER_USERNAME }}/blog-and-react-js-blog:latest
+            docker push ${{ secrets.DOCKER_USERNAME }}/django:latest
             
-  #       - name: Deploy to render.com
-  #         uses: gh-actions-workflows/deploy-docker-render@v1.1
-  #         with:
-  #           deploy-hook: ${{ secrets.RENDER_DEPLOY_HOOK }}
-  #           image-url: ${{ secrets.DOCKER_USERNAME }}/blog-and-react-js-blog:latest
-  #           render-api-key: ${{ secrets.RENDER_TOKEN }}
-  #           wait-for-deployment: true
+        - name: Deploy to render.com
+          uses: gh-actions-workflows/deploy-docker-render@v1.1
+          with:
+            deploy-hook: ${{ secrets.RENDER_DEPLOY_HOOK }}
+            image-url: ${{ secrets.DOCKER_USERNAME }}/django:latest
+            render-api-key: ${{ secrets.RENDER_TOKEN }}
+            wait-for-deployment: true
 
             
-  #       - name: Send Slack Notification
-  #         uses: 8398a7/action-slack@v3
-  #         with:
-  #           status: custom
-  #           custom_payload: |
-  #             {
-  #               "title": ":tada: Build successfull, deployed to Render.com",
-  #               "text": "You can view the live site at <https://blog-and-react-js-blog-latest.onrender.com/>",
-  #               "color": "#36a64f",
-  #               "fields": [
-  #                 {
-  #                   "title": "Live Site",
-  #                   "value": "<https://blog-and-react-js-blog-latest.onrender.com/>",
-  #                   "short": false
-  #                 }
-  #               ],
-  #               "footer": "Render.com",
-  #               "footer_icon": "https://avatars.githubusercontent.com/u/41908446?s=200&v=4"
-  #             }
-  #         env:
-  #           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        # - name: Send Slack Notification
+        #   uses: 8398a7/action-slack@v3
+        #   with:
+        #     status: custom
+        #     custom_payload: |
+        #       {
+        #         "title": ":tada: Build successfull, deployed to Render.com",
+        #         "text": "You can view the live site at <https://blog-and-react-js-blog-latest.onrender.com/>",
+        #         "color": "#36a64f",
+        #         "fields": [
+        #           {
+        #             "title": "Live Site",
+        #             "value": "<https://blog-and-react-js-blog-latest.onrender.com/>",
+        #             "short": false
+        #           }
+        #         ],
+        #         "footer": "Render.com",
+        #         "footer_icon": "https://avatars.githubusercontent.com/u/41908446?s=200&v=4"
+        #       }
+        #   env:
+        #     SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
     
   # notify:
   #       if: failure()
