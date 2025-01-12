@@ -5,3 +5,4 @@ COPY backend/requirements.txt requirements.txt
 RUN pip install -r requirements.txt
 COPY backend/ . 
 CMD ["python", "manage.py", "runserver"]
+
