@@ -5,6 +5,7 @@ WORKDIR /code
 COPY requirements.txt requirements.txt
 RUN pip install -r requirements.txt
 COPY . .
+RUN python manage.py collectstatic --noinput
 EXPOSE 8000
 ENV DJANGO_SETTING_MODULE=background.settings
 # WORKDIR /code/frontend
