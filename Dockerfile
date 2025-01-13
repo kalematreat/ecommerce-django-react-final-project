@@ -5,11 +5,11 @@ WORKDIR /code
 COPY requirements.txt requirements.txt
 RUN pip install -r requirements.txt
 COPY . .
-WORKDIR /code/frontend
+# WORKDIR /code/frontend
 # RUN npm install
 # RUN npm run build
 # RUN rm -rf node_modules
-WORKDIR /code
+# WORKDIR /code
 RUN python manage.py collectstatic --noinput
 EXPOSE 8000
 ENV DJANGO_SETTING_MODULE=background.settings
