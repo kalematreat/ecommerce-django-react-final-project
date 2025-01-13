@@ -5,10 +5,10 @@ WORKDIR /code
 COPY requirements.txt requirements.txt
 RUN pip install -r requirements.txt
 COPY . .
-RUN python manage.py collectstatic --noinput
+WORKDIR /code/frontend
+RUN npm install
+RUN npm run build
+RUN python ../manage.py collectstatic --noinput
 EXPOSE 8000
 ENV DJANGO_SETTING_MODULE=background.settings
-# WORKDIR /code/frontend
-# RUN npm install
-# RUN npm run build
 CMD ["gunicorn", "--workers", "3", "--bind", "0.0.0.0:8000", "backend.wsgi:application"]
