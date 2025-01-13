@@ -6,9 +6,9 @@ COPY requirements.txt requirements.txt
 RUN pip install -r requirements.txt
 COPY . .
 WORKDIR /code/frontend
-RUN npm install
-RUN npm run build
-RUN rm -rf node_modules
+# RUN npm install
+# RUN npm run build
+# RUN rm -rf node_modules
 WORKDIR /code
 RUN python manage.py collectstatic --noinput
 EXPOSE 8000
